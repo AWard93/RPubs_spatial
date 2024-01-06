@@ -1,0 +1,151 @@
+---
+title: "Visualizing Tissot's Indicatrices in ggplot2"
+author: "Alan Ward"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Map projections
+Projecting the surface of a three dimensional object onto a two dimensional surface is a significant mathematical challenge. The process of projection may distort the area or shape (and angle) of a spatial feature in addition to the distance between collections of spatial features. Here I demonstrate how to visualize the impacts various projections have on area, shape and distance. 
+
+Fortunately, R packages such as `sf` offer us this functionality behind the scenes through utilizing `PROJ`. `PROJ` is a library that enable us to quickly and conveniently switch between a large number of different projections.
+
+```{r libraries, echo = TRUE, warning = FALSE, include = TRUE, message = FALSE}
+#Loading libraries
+library(ggplot2)   # For generating the map visuals.
+library(sf)        # For handling spatial objects, transformations etc.
+library(dplyr)     # Data manipultaion and wrangling
+library(rworldmap) # Data source for world map
+```
+
+First we need to import the map of the world
+
+```{r world map, echo = TRUE}
+world<- getMap()%>%            #Importing map file
+  st_as_sf()%>%                #Converting it into an 'sf' object
+  st_transform(., crs = 4326)  #Transforming the coordinate reference                                      system.
+```
+
+# Tissot's Indicatrices 
+
+Now we must set up our grid of Tissot's indicatices. These are a grid of circles of equal size that are evenly spaced across longitude and latitude. They help us visualize and appreciate the distortion in shapes, areas, and distances that can occur through projection. This visualization technique was first presentd by the French mathematician Nicolas Auguste Tissot during the late 19th century. 
+
+````{r circles, echo = TRUE, include = TRUE}
+
+lon <- seq(-135,135, 45) # Defining the longitiudes (vertical grid lines)
+lat <- seq(-70,70,35)    # Defining the latitudes (horizontal grid lines)
+         
+#Generating coordinates for each time combindation of lat and long
+latlon<- lapply(lat, data.frame, lon)%>%  
+  bind_rows()
+names(latlon) <- c("lat", "lon")
+  
+#Generating the circles to be used for our Tissot's indicatrices
+tissots <-latlon%>%
+  st_as_sf(., coords = c("lon", "lat"))%>% #Converting our latlon into `sf`
+  st_set_crs(4326)%>%                      #Giving them a coordinate reference system
+  st_buffer(., dist = units::set_units(500, "km")) #Generating circleswith a 500km radius from our points.
+
+head(tissots)
+
+````
+
+Now we are ready to put the map and grid of circles together to visualise and explore the impacts projections have on area,shape and distance.
+
+First lets start with the orthographic projection in which the coordinates are projected onto a sphere. Note she uniformity of the circles across latitude and longitude.
+
+````{r ortho, echo = TRUE, include = TRUE}
+
+ggplot()+
+  geom_sf(data = world)+
+  geom_sf(data = tissots)+
+  coord_sf( crs= "+proj=ortho +lat_0=50 +lon_0 = 0")
+
+````
+
+#Mercator
+This is a commonly used map projection
+
+````{r Mercator, echo = TRUE, include = TRUE}
+
+ggplot()+
+  geom_sf(data = world%>%
+            filter(continent != "Antarctica"))+ #Antarctica too stretched
+  geom_sf(data = tissots)+
+  coord_sf(crs = "+proj=merc")
+
+````
+
+Notice that the shape has been preserved, but the areas of the landmasses 
+has dramatically expanded at higher latitudes (further north and south) and shrunk at lower latitudes (closer to the equator).
+
+# Interrupted Goode Homolosine
+This projection does well to preserve the shapes and areas overall, but in some areas results in severe distortion at certain locations, with the only large landmass notably impacted being greenland.
+
+````{r  igh, echo = TRUE, include = TRUE }
+
+ggplot()+
+  geom_sf(data = world)+
+  geom_sf(data = tissots)+
+  coord_sf(crs = "+proj=igh")
+
+````
+
+# Azimuthal Equidistant
+Area, size and distance are well preserved at 0 longitude but the distortion increases with increasing longitude.
+````{r aeqd, echo = TRUE, include = TRUE}
+
+ggplot()+
+  geom_sf(data = world)+
+  geom_sf(data = tissots)+
+  coord_sf(crs = "+proj=aeqd")
+
+````
+
+# Nicolosi Globular
+
+```` {r nicol, echo = TRUE, include = TRUE}
+
+ggplot()+
+  geom_sf(data = world)+
+  geom_sf(data = tissots)+
+  coord_sf(crs = "+proj=nicol")
+
+
+````
+
+# van der Grinten IV
+
+```` {r vandg4, echo = TRUE, include = TRUE, warning = FALSE, message = FALSE}
+
+ggplot()+
+  geom_sf(data = world)+
+  geom_sf(data = tissots)+
+  coord_sf(crs = "+proj=vandg4")
+
+````
+
+Projections available can be viewed using the `sf_proj_info()` function available within the `sf` package. 
+
+All code used to generate this document:
+
+
+For more information on PROJ:
+https://proj.org/en/9.3/about.html
+
+
+
+
+
+
+
+
+
+
+
+
+
